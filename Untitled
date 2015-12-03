@@ -1,0 +1,16 @@
+For each graph generate 3 sparse graphs:
+	out/graph_name_coarsest.txt
+	out/graph_name_mid.txt
+	out/graph_name_finest.txt
+
+So what does benchmark.py do?
+	benchmark.py would read the original graph, compute properties
+	Next read the other tree graphs and compute their properties.
+	Output is stored in reports/graph_name.txt
+
+What should final output look like?
+	Final output should look like this:
+	Original G. prop_name:value, prop_name:value, prop_name:value ...
+	Coarse G prop_name:value, prop_name:value, prop_name:value ...
+	Mid G prop_name:value, prop_name:value, prop_name:value ...
+	Fine G prop_name:value, prop_name:value, prop_name:value ...

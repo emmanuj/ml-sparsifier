@@ -1,0 +1,10 @@
+TODO for paper completion
+-- multiscale becnhmark script DONE
+-- Implement Spearman rank and re-run benchmark (for affected properties) DONE
+-- Increase fonts on plots
+-- Benchmark for multi scale DONE
+-- Visualization for Multiscale
+-- Runtimes for both multiscale and single level
+-- Complete Discussion of results
+
+Has to be completed by Friday.

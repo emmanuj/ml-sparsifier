@@ -1,0 +1,8 @@
+*.d.*
+*.d
+*.o
+run
+*.save
+*.save.*
+*.edges
+*.dSYM
