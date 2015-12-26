@@ -8,6 +8,8 @@
 #include <fstream>
 #include <cmath>
 #include <omp.h>
+#include <cstdlib>
+#include <stdio.h>
 
 class SortByAlgebraicDistance
 {
@@ -57,6 +59,7 @@ degs(nds.size())
 {
 	#pragma omp parallel
 	{
+
 		#pragma omp for
 		for(Index i=0;i<nds.size();i++){
 			//copy node properties
@@ -134,9 +137,13 @@ void Graph::computeAlgebraicDistances(optparse::Values& options){
     for(int h=0;h<Ri;h++){
         std::vector<double> x_vec(nodes.size());
         std::generate(x_vec.begin(), x_vec.end(), getRandom);//generate the random number between -0.5 to 0.5
-        
+
         #pragma omp parallel
-        {	
+        {
+			//printf("Hello World from thread = %d\n", omp_get_thread_num(),omp_get_num_threads());
+			//if(omp_get_thread_num() == 0){
+			//	printf("Number of threads: %d\n", omp_get_num_threads());
+			//}
         	#pragma omp for
         	for(int k=0;k<40;k++){
 	            std::vector<double> c_vec(nodes.size());
@@ -202,7 +209,7 @@ void Graph::computeAlgebraicDistances(optparse::Values& options){
 	    }
     }
 
-    
+
 }
 
 

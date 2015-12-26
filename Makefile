@@ -6,7 +6,7 @@ INCLUDES=#-I/Users/emmanueljohn/libs/NetworKit/include #-I/home/emmanuj/root/inc
 LFLAGS= #-L/Users/emmanueljohn/libs/NetworKit
 
 # Linker flags for both OS X and Linux
-LDFLAGS=#-fopenmp #-lexpat #-ltcmalloc -lprofiler -fopenmp #-lNetworKit
+LDFLAGS=-fopenmp #-lexpat #-ltcmalloc -lprofiler -fopenmp #-lNetworKit
 
 # Generates list of object files from all the
 #   source files in directory

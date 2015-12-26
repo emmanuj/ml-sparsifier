@@ -125,7 +125,7 @@ void MinLASolver::markEdges(Graph& g){
 				//clean up
 				std::vector<double>().swap(v);
 				std::vector<double>().swap(diff);
-
+				
 				float h = (3.5 * stdev)/cbrt(g.degree(i)); //bin width
 				int k = h==0 ? 1 :ceil((nbs[g.degree(i)-1].algebraicDist - nbs[0].algebraicDist)/h) + 1; //number of bins
 				////std::cout<<"Node "<<id<<std::endl;
@@ -368,6 +368,7 @@ void MinLASolver::start(){
 
 		paramlist = std::vector<double>(1);
 		paramlist[0] = std::stod((std::string)options.get("s"));
+		graph.computeAlgebraicDistances(options);
 		markEdges(graph);
 	}else{
 		ML(graph);
@@ -378,7 +379,7 @@ void MinLASolver::start(){
 	//lets try to find the parameter
 	//binarySearchParameter(graph, 0.2, 0.4);
 	//timer.stop((std::string)options.get("gname"));
-	
+
 
 	//Lets print the sparsified graph
 	std::cout<<"Writing sparsified graph"<<std::endl;
@@ -410,7 +411,7 @@ void MinLASolver::start(){
 	fout.close();
 
 
-	
+
 	std::cout<<"Orig # edges: "<<edge0<<" new edge count: "<<edge1<<std::endl;
 	//printMarkedStats(graph);
 }
