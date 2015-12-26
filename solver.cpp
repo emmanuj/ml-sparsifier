@@ -18,9 +18,9 @@
 #include "reader.h"
 #include "edgelistreader.h"
 #include "graphreader.h"
-#include "graphsparsifier.h"
 #include "etimer.h"
 #include "log.h"
+#include <omp.h>
 
 class SortNeighbors{
 public:
@@ -45,42 +45,44 @@ private:
 };
 
 MinLASolver::MinLASolver(optparse::Values& op):
-options(op), paramlist(){
+options(op), paramlist(), param(-1.0){
 }
 
-void printMarkedStats(Graph& graph){
+void printMarkedStats(Graph& g){
 	long c = 0;
 	long t =0;
-	for(int i=0;i<graph.getSize();i++){
-		const std::vector<Neighbor> nbs = graph.neighbors(i);
-		t+= nbs.size();
-		for(const Neighbor& n: nbs){
+	for(int i=0;i<g.getSize();i++){
+		std::vector<Neighbor> nbs = g.neighbors(i);
+		t+=nbs.size();
+		for(Neighbor& n: nbs){
 			if(n.isdelete){
-				if(i<n.nodeId) continue;
-				c++;
+				if(i<n.nodeId){
+					c++;
+				}
 			}
 		}
 	}
 	std::cout<<"Marked: "<<c<<", Total: "<<t/2<<std::endl;
 }
-void MinLASolver::markEdgesForDeletion(Graph& g){
+
+void MinLASolver::markEdges(Graph& g){
 	int count=0;
 	double param = paramlist[g.getLevel()];
 	std::cout<<"Level: "<<g.getLevel()<<" Params: "<<param<<std::endl;
 	if(param > -1){
-		std::vector<std::stack<long> > deleted(g.getSize());
+		std::vector<std::stack<long> > marked(g.getSize());
 		for(unsigned i=0;i<g.getSize();i++){
 
 			//mark previously stored edges
-			while(deleted[i].size() > 0 ){
-				g.markEdgeForDeletion(i, g.getNode(i).getNeighborAt(deleted[i].top()));
-				deleted[i].pop();
+			while(marked[i].size() > 0 ){
+				g.markEdge(i, g.getNode(i).getNeighborAt(marked[i].top()));
+				marked[i].pop();
 			}
 			std::vector<Neighbor> nbs = g.getNode(i).neighbors();
 
 			if(g.degree(i) == 0) continue;
 
-			int nh = round(pow(g.degree(i), param)); //TODO: Can change this to either a floor, a ceil and a round. Explore the different options.
+			int nh = ceil(pow(g.degree(i), param));
 
 			if(nh == 0) continue;
 			if((bool)options.get("weak") || (bool)options.get("strong")){
@@ -88,8 +90,8 @@ void MinLASolver::markEdgesForDeletion(Graph& g){
 				//mark. remember to take into account all the time edges already marked.
 				int c = 0;
 				while(c < nh && !nbs[c].isdelete){
-					g.markEdgeForDeletion(i,  nbs[c]);
-					deleted[nbs[c].nodeId].push(nbs[c].invPos);//stores the position of the second edge that needs to be removed
+					g.markEdge(i,  nbs[c]);
+					marked[nbs[c].nodeId].push(nbs[c].invPos);//stores the position of the second edge that needs to be removed
 					c++;
 				}
 			}else{ //a little bit of both
@@ -126,8 +128,8 @@ void MinLASolver::markEdgesForDeletion(Graph& g){
 
 				float h = (3.5 * stdev)/cbrt(g.degree(i)); //bin width
 				int k = h==0 ? 1 :ceil((nbs[g.degree(i)-1].algebraicDist - nbs[0].algebraicDist)/h) + 1; //number of bins
-				//std::cout<<"Node "<<id<<std::endl;
-				//std::cout<<"#bins: "<<k<<" "<<" bin width: "<<h<<" # to remove :"<<nh<<" #data points "<<g.degree(i)<<std::endl;
+				////std::cout<<"Node "<<id<<std::endl;
+				////std::cout<<"#bins: "<<k<<" "<<" bin width: "<<h<<" # to remove :"<<nh<<" #data points "<<g.degree(i)<<std::endl;
 
 				int l =0;
 				int idx = 0;
@@ -160,8 +162,8 @@ void MinLASolver::markEdgesForDeletion(Graph& g){
 						int end = bins[p].size();
 						while(c < nh_bin && end > 0){
 							int pos = rand() % end;
-							g.markEdgeForDeletion(i,  bins[p][pos]);
-							deleted[bins[p][pos].nodeId].push(bins[p][pos].invPos);//stores the position of the second edge that needs to be removed
+							g.markEdge(i,  bins[p][pos]);
+							marked[bins[p][pos].nodeId].push(bins[p][pos].invPos);//stores the position of the second edge that needs to be removed
 							//move the neigbor to back and reduce range for random
 							if(pos != (end - 1)){
 								Neighbor n = bins[p][pos];
@@ -176,8 +178,8 @@ void MinLASolver::markEdgesForDeletion(Graph& g){
 				}else{
 					int c = 0;
 					while(c < nh && !nbs[c].isdelete){
-						g.markEdgeForDeletion(i,  nbs[c]);
-						deleted[nbs[c].nodeId].push(nbs[c].invPos);//stores the position of the second edge that needs to be removed
+						g.markEdge(i,  nbs[c]);
+						marked[nbs[c].nodeId].push(nbs[c].invPos);//stores the position of the second edge that needs to be removed
 						c++;
 					}
 				}
@@ -188,20 +190,20 @@ void MinLASolver::markEdgesForDeletion(Graph& g){
 	}
 }
 
-void MinLASolver::removeEdgesFromCoarse(Graph& fineG, Graph& coarseG){
-	//std::cout<<"Coarse edges: "<<std::endl;
+void MinLASolver::inheritMarkedEdges(Graph& fineG, Graph& coarseG){
+	////std::cout<<"Coarse edges: "<<std::endl;
 	int count =0;
 	for(unsigned i=0;i<coarseG.getSize();i++){
 		std::vector<Neighbor>& nbs = coarseG.neighbors(i);
 		for(Neighbor& n: nbs){
 			if(n.isdelete){
 				if(i < n.nodeId) continue;
-				//std::cout<<i<<" "<<n.nodeId<<" "<<n.fineEdges.size()<<std::endl;
+				////std::cout<<i<<" "<<n.nodeId<<" "<<n.fineEdges.size()<<std::endl;
 				for(std::pair<Index, Index>& f_edge: n.fineEdges){
 					Neighbor nb = fineG.getNode(f_edge.first).getNeighborAt(f_edge.second);
-					//std::cout<<"\t"<<f_edge.first<<" "<<nb.nodeId<<std::endl;
-					fineG.markEdgeForDeletion(f_edge.first, fineG.getNode(f_edge.first).getNeighborAt(f_edge.second));
-					fineG.markEdgeForDeletion(nb.nodeId, fineG.getNode(nb.nodeId).getNeighborAt(nb.invPos));
+					////std::cout<<"\t"<<f_edge.first<<" "<<nb.nodeId<<std::endl;
+					fineG.markEdge(f_edge.first, fineG.getNode(f_edge.first).getNeighborAt(f_edge.second));
+					fineG.markEdge(nb.nodeId, fineG.getNode(nb.nodeId).getNeighborAt(nb.invPos));
 					count++;
 				}
 			}
@@ -211,21 +213,21 @@ void MinLASolver::removeEdgesFromCoarse(Graph& fineG, Graph& coarseG){
 
 void MinLASolver::uncoarsen(Graph& fineG, Graph& coarseG){
 	std::cout<<"Uncoarsening... Level: "<<fineG.getLevel()<<std::endl;
-	removeEdgesFromCoarse(fineG, coarseG);
+	inheritMarkedEdges(fineG, coarseG);
 	fineG.computeAlgebraicDistances(options);
-	markEdgesForDeletion(fineG);
-	//printMarkedStats(fineG);
+	markEdges(fineG);
+	printMarkedStats(fineG);
 }
 
 void MinLASolver::ML(Graph& g){
 	int l = g.getLevel();
 	std::cout<<"==================== level: "<<l<<" ======================"<<std::endl;
-	std::cout<<"********************Graph stats ****************************"<<std::endl;
-	std::cout<<" # nodes: "<<g.getNodes().size()<<std::endl;
-	std::cout<<" #Edges "<< g.getEdgeCount()<<std::endl;
+	//std::cout<<"********************Graph stats ****************************"<<std::endl;
+	//std::cout<<" # nodes: "<<g.getNodes().size()<<std::endl;
+	//std::cout<<" #Edges "<< g.getEdgeCount()<<std::endl;
 
-	long max = 0;
-	long min = 9999999999;
+	//long max = 0;
+	/*long min = 9999999999;
 	for(int i=0;i<g.getSize();i++){
 		if(max < g.degree(i)){
 			max = g.degree(i);
@@ -235,42 +237,62 @@ void MinLASolver::ML(Graph& g){
 		}
 	}
 
-	std::cout<<" Max Degree: "<<max<<std::endl;
-	std::cout<<" Min Degree: "<<min<<std::endl;
-	std::cout<<"********************end graph stats ************************"<<std::endl;
+	//std::cout<<" Max Degree: "<<max<<std::endl;
+	//std::cout<<" Min Degree: "<<min<<std::endl;
+	//std::cout<<"********************end graph stats ************************"<<std::endl;*/
 
 	if(g.getSize()==10){
 		//g.print();
 		std::cout<<"In coarsest level. computing solution..."<<std::endl;
 		ETimer timer;
 		timer.start();
+
 		g.computeAlgebraicDistances(options);
 
-		//create parameter list for sparsifying for each level
-		int levelSpan = (int) options.get("level-span");
-		int part = (int) options.get("sparse-level");
-		double param = (double) options.get("s");
+		paramlist = std::vector<double>(g.getLevel()+1, -1.0);
 
+		std::string plist = (std::string) options.get("param-list");
+		std::vector<std::string> plist_st = Util::split(plist,',');
+
+		int k = paramlist.size();
+		for(int i=0;i< plist_st.size() && k>0;i++){
+			paramlist[k-1] = std::stod(plist_st[i]);
+			k--;
+		}
+
+		//Benchmark code
+		//create parameter list for sparsifying for each level
+		/*int levelSpan = (int) options.get("level-span");
+		int part = (int) options.get("sparse-level");
+		//double param = (double) options.get("s");
+		//std::cout<<"here "<<std::endl;
+		//paramlist = std::vector<double>(g.getLevel()+1,param);
 		paramlist = std::vector<double>(g.getLevel()+1,-1.0);
 		if(part ==0){ //sparsify only at coarsest levels
+			//double p =0;
 			int startIdx = paramlist.size() -1;
 			for(int i= startIdx; i > (startIdx - levelSpan) && i > 0; i--){
 				paramlist[i] = param;
+				//p+=0.1;
 			}
 		}else if(part == 1){// sparsify at the mid levels
 			int startIdx = floor(paramlist.size()/2) - ceil(levelSpan/2);
+			//double p =param + 0.3;
 			for(int i=startIdx;i < (startIdx+levelSpan) && i < paramlist.size(); i++){
 				paramlist[i] = param;
+				//p-=0.1;
 			}
 		}else if(part == 2){ //sparsify at the finest levels
 			int startIdx = 0;
+			//double p =param + 0.3;
 			for(int i= startIdx; i < (startIdx + levelSpan) && i < paramlist.size(); i++){
 				paramlist[i] = param;
+				//p-=0.1;
 			}
 		}
-		std::cout<<"Got here "<<std::endl;
-		markEdgesForDeletion(g);
-		printMarkedStats(g);
+		//std::cout<<"Got here "<<std::endl;*/
+		markEdges(g);
+		//printMarkedStats(g);
 		timer.stop("Completed in ");
 	}else{
 		Graph coarseG = GraphUtil::coarsenGraph(g, options);
@@ -280,12 +302,43 @@ void MinLASolver::ML(Graph& g){
 		}
 	}
 }
+inline double mround( double val )
+{
+    if( val < 0 ) return ceil(val - 0.5);
+    return floor(val + 0.5);
+}
+//parameter search for benchmarking
+void MinLASolver::binarySearchParameter(Graph& g, double target_lower, double target_upper){
 
+	double lo =0.0;
+	double hi = 1.0;
+	Graph sparse;
+	int i =0;
+	int niter = 20;
+	while(i < niter){
+		double mid = lo + ((hi-lo)*0.5);
+		param = mid;
+		sparse =g;
+		ML(sparse);
+
+		double actual_ratio = mround((sparse.getEdgeCount()/(g.getEdgeCount() * 1.0)) * 100 ) /100.0;
+		std::cout<<"Run: "<<i<<"Orig: "<<g.getEdgeCount()<<" Sparse count: "<<sparse.getEdgeCount()<<" actual ratio: "<<actual_ratio<<std::endl;
+		if(actual_ratio >= target_lower && actual_ratio <= target_upper){
+			break;
+		}else if(actual_ratio > target_upper){
+			lo = mid;
+		}else{//} if(actual_ratio < target_lower){
+			hi = mid;
+		}
+	}
+
+	g = sparse;
+}
 void MinLASolver::start(){
 	ETimer timer;
 	timer.start();
 	//read in graph
-	//std::cout<<"Reading graph.... "<<std::endl;
+	std::cout<<"Reading graph.... "<<std::endl;
 	//TODO: check if file exist
 	//TODO: do some error checking on the graph
 	std::ifstream listfile((std::string)options.get("i"));
@@ -301,30 +354,63 @@ void MinLASolver::start(){
 		graph = elist.read(listfile, (long) options.get("n"));
 	}
 
-	timer.stop("Finished reading graph in ");
+	timer.stop("Finished reading graph in");
 
 	std::vector<Node> solution;
-	std::cout<<"Started coarsening..."<<std::endl;
-	timer.start();
+	//std::cout<<"Started coarsening..."<<std::endl;
+	//timer.start();
 
 	int edge0 = graph.getEdgeCount();
+	timer.start();
 
-	ML(graph);
+	std::cout<<"Sparsifying graph..."<<std::endl;
+	if((bool)options.get("single-level")){
+
+		paramlist = std::vector<double>(1);
+		paramlist[0] = std::stod((std::string)options.get("s"));
+		markEdges(graph);
+	}else{
+		ML(graph);
+	}
+
 	timer.stop("Algorithm completed in");
 
+	//lets try to find the parameter
+	//binarySearchParameter(graph, 0.2, 0.4);
+	//timer.stop((std::string)options.get("gname"));
+	
+
 	//Lets print the sparsified graph
-	std::ofstream fout((std::string)options.get("o"));
+	std::cout<<"Writing sparsified graph"<<std::endl;
+	std::ofstream fout((std::string)options.get("gname")+"_"+(std::string)options.get("o"));
+	std::vector<long> degs = graph.getDegrees();
+	int edge1 =0;
 	for(int i=0;i<graph.getSize();i++){
 		const std::vector<Neighbor> nbs = graph.neighbors(i);
+		//ensure at least one edge per node
+		if(!((bool)options.get("single-level"))){
+			if(graph.degree(i) == 0 && degs[i] == 0 ){
+				Neighbor n = nbs[rand() % nbs.size() ];
+				fout<<i<<" "<< n.nodeId<<std::endl;
+				degs[i]++;
+				edge1++;
+				continue;
+			}
+		}
 		for(const Neighbor& n: nbs){
 			if(i<n.nodeId) continue;
-			if((!n.isdelete)||(graph.degree(n.nodeId) <= 1 || graph.degree(i) <=1)){
+			if(n.isdelete){
+				edge1++;
 				fout<<i<<" "<< n.nodeId<<std::endl;
 			}
 		}
 	}
 
-	int edge1 = graph.getEdgeCount();
-	std::cout<<"Orig # edges: "<<edge0<<" new # edge: "<<edge1<<std::endl;
+	fout.flush();
+	fout.close();
+
+
+	
+	std::cout<<"Orig # edges: "<<edge0<<" new edge count: "<<edge1<<std::endl;
 	//printMarkedStats(graph);
 }

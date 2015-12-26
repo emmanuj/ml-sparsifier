@@ -6,7 +6,7 @@ INCLUDES=#-I/Users/emmanueljohn/libs/NetworKit/include #-I/home/emmanuj/root/inc
 LFLAGS= #-L/Users/emmanueljohn/libs/NetworKit
 
 # Linker flags for both OS X and Linux
-LDFLAGS =#-lexpat #-ltcmalloc -lprofiler -fopenmp #-lNetworKit
+LDFLAGS=#-fopenmp #-lexpat #-ltcmalloc -lprofiler -fopenmp #-lNetworKit
 
 # Generates list of object files from all the
 #   source files in directory
@@ -47,9 +47,9 @@ setclang:
 
 # Phony target to use g++ for compile and linking
 setgcc:
-	@echo "Setting g++"
-	$(eval CXX = g++)
-	$(eval CXX_LINK = g++)
+	@echo "Setting g++-5"
+	$(eval CXX = g++-5)
+	$(eval CXX_LINK = g++-5)
 
 # $< refers to the first dependency
 # Uses static pattern rule to keep from compiling all

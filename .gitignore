@@ -6,3 +6,7 @@ run
 *.save.*
 *.edges
 *.dSYM
+*.dat
+*.out
+run_scripts/*
+*.pbs

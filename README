@@ -1,8 +1,0 @@
-To build:
- $make
-
-To run:
- $./run <graphfile> <numnodes> <zeroIndexed> 
-  - <graphfile>: file name of graph file. Pass full path if not in current directory
-  - <numnodes>: Number of nodes in the graph
-  - <zeroIndexed> (0 or 1): pass 0, if graph node id starts at 0 and 1 if graph node id start at 1. 

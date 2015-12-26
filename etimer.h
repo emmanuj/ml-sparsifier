@@ -21,7 +21,7 @@ public:
     }
     void stop(const std::string desc){
         en_time = times(&en_cpu);
-        std::cout<< desc << " : "<<(double)(en_time - st_time)/100<<" secs."<<std::endl;
+        std::cout<< desc << ","<<(double)(en_time - st_time)/100<<" secs."<<std::endl;
     }
 };
 

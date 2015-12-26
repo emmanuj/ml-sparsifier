@@ -46,6 +46,7 @@ int main(int argc, char * argv[]) {
 	parser.set_defaults("d", "space");
 
 	parser.add_option("--zero-index") .action("store_true").dest("zero-Index") .help("Indicate whether node ID's are zero indexed");
+	parser.add_option("--single-level") .action("store_true").dest("single-level") .help("Sparsify only at the finest level");
 	parser.add_option("--permute") .action("store_true").dest("permute").help("Permute initial node ordering");
 	parser.add_option("--weak").action("store_true").dest("weak").help("Prefer weak edges in sparsification");
 	parser.add_option("--strong").action("store_true").dest("strong").help("Prefer strong edges in sparsification");

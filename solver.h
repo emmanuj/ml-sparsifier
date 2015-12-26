@@ -15,10 +15,11 @@ private:
 
 	void ML(Graph& g);
 	void uncoarsen(Graph& fineG, Graph& coarseG);
-	void removeEdgesFromCoarse(Graph& fineG, Graph& coarseG);
-	void markEdgesForDeletion(Graph& g);
-
+	void inheritMarkedEdges(Graph& fineG, Graph& coarseG);
+	void markEdges(Graph& g);
+	void binarySearchParameter(Graph& g, double target_lower, double target_upper);
 	optparse::Values& options;
 	std::vector<double> paramlist;
+	double param;
 };
 #endif

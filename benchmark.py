@@ -51,7 +51,7 @@ def averageBetweennessPositions(G):
 def main():
 
 	if(len(sys.argv) < 3): #minimum to run
-		print("Invalid number of parameter: Usage: ./generateSparseGraphs name path")
+		print("Invalid number of parameter: Usage: ./benchmark.py name path")
 		sys.exit(0)
 
 	setLogLevel("FATAL")
@@ -86,11 +86,11 @@ def main():
 	files = ["_coarsest.txt", "_mid.txt", "_finest.txt"]
 	titles = ["Coarse G1", "Mid G2", "Fine G3"]
 	gnames = dict(zip(files, titles))
-	print(G.numberOfNodes())
+	#print(G.numberOfNodes())
 	# read other graphs
 	for f in files:
 		sg = graphio.EdgeListReader(' ',0,"#",True, False).read("out/"+name+f)
-		print(sg.numberOfNodes())
+		#print(sg.numberOfNodes())
 		sg_result = [
 			gnames[f], sg.numberOfEdges(), sg.numberOfNodes(), clustering(sg),
 			spearman_rank(loc_clust_dist, centrality.LocalClusteringCoefficient(sg).run().scores()), #clust dist

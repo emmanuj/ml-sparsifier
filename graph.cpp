@@ -7,7 +7,7 @@
 #include "edge.h"
 #include <fstream>
 #include <cmath>
-
+#include <omp.h>
 
 class SortByAlgebraicDistance
 {
@@ -55,64 +55,72 @@ level(l),
 edge_count(0),
 degs(nds.size())
 {
-	for(Index i=0;i<nds.size();i++){
-		//copy node properties
-		nodes[i].setNodeId(i);
-		nodes[i].setPrevId(nds[i]);
-	}
-	//add edges
-	for(Index i=0;i<coarseEdges.size();i++){
-		if(coarseEdges[i].size() == 0) continue;
-		//sort them by index
-		sort(coarseEdges[i].begin(), coarseEdges[i].end(),[=](CoarseEdge a, CoarseEdge b){
-            return a.nodeId > b.nodeId;
-        });
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for(Index i=0;i<nds.size();i++){
+			//copy node properties
+			nodes[i].setNodeId(i);
+			nodes[i].setPrevId(nds[i]);
+		}
+		//add edges
+		#pragma omp for
+		for(Index i=0;i<coarseEdges.size();i++){
+			if(coarseEdges[i].size() == 0) continue;
+			//sort them by index
+			sort(coarseEdges[i].begin(), coarseEdges[i].end(),[=](CoarseEdge a, CoarseEdge b){
+	            return a.nodeId > b.nodeId;
+	        });
 
-		int j =0;
-		Index cur_idx = coarseEdges[i][j].nodeId;
-		edgeweight sum = 0;
+			int j =0;
+			Index cur_idx = coarseEdges[i][j].nodeId;
+			edgeweight sum = 0;
 
-		while(j < coarseEdges[i].size()){
-			std::vector< std::pair<Index, Index> > fineEdges;
-			while( j< coarseEdges[i].size() && cur_idx == coarseEdges[i].at(j).nodeId ){
-				sum += coarseEdges[i][j].weight;
-				fineEdges.push_back(coarseEdges[i][j].fineEdge);
-				j++;
-			}
-			addEdge(i, cur_idx, sum, fineEdges);
-			//std::cout<<"======= Edge ["<<nodes[i].getPrevId()<<" : "<<nodes[cur_idx].getPrevId()<<"] ======="<<std::endl;
-			//for(std::pair<Index,Index>& f: fineEdges){
-			//	std::cout<<f.first<<" - "<<f.second<<std::endl;
-			//}
-			sum=0;
-			if(j != coarseEdges[i].size() ){
-				cur_idx = coarseEdges[i].at(j).nodeId;
+			while(j < coarseEdges[i].size()){
+				std::vector< std::pair<Index, Index> > fineEdges;
+				while( j< coarseEdges[i].size() && cur_idx == coarseEdges[i].at(j).nodeId ){
+					sum += coarseEdges[i][j].weight;
+					fineEdges.push_back(coarseEdges[i][j].fineEdge);
+					j++;
+				}
+				addEdge(i, cur_idx, sum, fineEdges);
+				//std::cout<<"======= Edge ["<<nodes[i].getPrevId()<<" : "<<nodes[cur_idx].getPrevId()<<"] ======="<<std::endl;
+				//for(std::pair<Index,Index>& f: fineEdges){
+				//	std::cout<<f.first<<" - "<<f.second<<std::endl;
+				//}
+				sum=0;
+				if(j != coarseEdges[i].size() ){
+					cur_idx = coarseEdges[i].at(j).nodeId;
+				}
 			}
 		}
-	}
 
-	long double volSum =0.0;
-	for(int i=0;i<nds.size();i++){
-		setVolume(mapper[nds[i]], fineGraph.getNode(nds[i]).V());
-	}
-	//compute volumes
-	for(int i=0;i<fineGraph.getSize();i++){
-		if(fineGraph.getNode(i).isC()) continue;
-		Index idx = fineGraph.getNode(i).getNodeId();
-		std::vector<Neighbor>& cnbs = fineGraph.coarseNeighbors(idx);
-		for(unsigned j=0;j<cnbs.size();j++){
-			double p = cnbs.at(j).pij;
-			double vol = (p * fineGraph.getNode(idx).V());
-			setVolume(mapper[cnbs[j].nodeId], nodes[mapper[cnbs[j].nodeId]].V() + vol);
+		//long double volSum =0.0;
+		#pragma omp for
+		for(int i=0;i<nds.size();i++){
+			setVolume(mapper[nds[i]], fineGraph.getNode(nds[i]).V());
 		}
+
+		//compute volumes
+		#pragma omp for
+		for(int i=0;i<fineGraph.getSize();i++){
+			if(fineGraph.getNode(i).isC()) continue;
+			Index idx = fineGraph.getNode(i).getNodeId();
+			std::vector<Neighbor>& cnbs = fineGraph.coarseNeighbors(idx);
+			for(unsigned j=0;j<cnbs.size();j++){
+				double p = cnbs.at(j).pij;
+				double vol = (p * fineGraph.getNode(idx).V());
+				setVolume(mapper[cnbs[j].nodeId], nodes[mapper[cnbs[j].nodeId]].V() + vol);
+			}
+		}
+		//if(level ==2) print();
+		//for(Node& n: nodes){
+		//	volSum+=n.V();
+		//}
+		//if((int)ceil(volSum) != 100 ) print();
+		//std::cout<<"Total volume: "<<volSum<<std::endl;
+		//print();
 	}
-	//if(level ==2) print();
-	for(Node& n: nodes){
-		volSum+=n.V();
-	}
-	//if((int)ceil(volSum) != 100 ) print();
-	std::cout<<"Total volume: "<<volSum<<std::endl;
-	//print();
 }
 double getRandom(){
 	return (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) - 0.5;
@@ -126,58 +134,75 @@ void Graph::computeAlgebraicDistances(optparse::Values& options){
     for(int h=0;h<Ri;h++){
         std::vector<double> x_vec(nodes.size());
         std::generate(x_vec.begin(), x_vec.end(), getRandom);//generate the random number between -0.5 to 0.5
-        for(int k=0;k<40;k++){
-            std::vector<double> c_vec(nodes.size());
-            for(int i=0;i<nodes.size();i++){
-                std::vector<Neighbor>& nbs = neighbors(nodes[i].getNodeId());
-                double prod_sum =0;
-                double sum = 0;
-                for(Neighbor& n: nbs){
-                    if(!n.isdelete){
-                    	sum +=n.weight;
-                    	prod_sum+= (n.weight * x_vec[n.nodeId]);
-                    }
-                }
+        
+        #pragma omp parallel
+        {	
+        	#pragma omp for
+        	for(int k=0;k<40;k++){
+	            std::vector<double> c_vec(nodes.size());
+	            for(int i=0;i<nodes.size();i++){
+	                std::vector<Neighbor>& nbs = neighbors(nodes[i].getNodeId());
+	                double prod_sum =0;
+	                double sum = 0;
+	                for(Neighbor& n: nbs){
+	                    if(!n.isdelete){
+	                    	sum +=n.weight;
+	                    	prod_sum+= (n.weight * x_vec[n.nodeId]);
+	                    }
+	                }
 
-                if(sum == 0){ //Avoid divide by zero error
-                	c_vec[i] = (alfa * x_vec[i]);
-                }else{
-                	c_vec[i] = (alfa * x_vec[i]) + ( (1 - alfa) * (prod_sum/sum));
-                }
+	                if(sum == 0){ //Avoid divide by zero error
+	                	c_vec[i] = (alfa * x_vec[i]);
+	                }else{
+	                	c_vec[i] = (alfa * x_vec[i]) + ( (1 - alfa) * (prod_sum/sum));
+	                }
 
-            }
-            x_vec =  c_vec;
+	            }
+	            x_vec =  c_vec;
+	        }
         }
 
         //rescale
         double mn = *std::min_element(x_vec.begin(), x_vec.end());
         double mx = *std::max_element(x_vec.begin(), x_vec.end());
-        for(int i=0;i<x_vec.size();i++){
-            const double a = x_vec[i] - mn;
-            const double b = mx - x_vec[i];
-            double scaledX = (0.5 * ( a - b))/(a + b);
-            x_vec[i] = scaledX;
-        }
-        for(int i=0;i<nodes.size();i++){
-            for(int j=0;j<nodes[i].neighbors().size();j++){
-                Index nid = nodes[i].neighbors()[j].nodeId;
-                nodes[i].neighbors()[j].Ro.push_back(fabs(x_vec[i] - x_vec[nid]));
-            }
+        #pragma omp parallel
+        {
+        	#pragma omp for
+        	for(int i=0;i<x_vec.size();i++){
+	            const double a = x_vec[i] - mn;
+	            const double b = mx - x_vec[i];
+	            double scaledX = (0.5 * ( a - b))/(a + b);
+	            x_vec[i] = scaledX;
+	        }
+
+	        #pragma omp for
+	        for(int i=0;i<nodes.size();i++){
+	            for(int j=0;j<nodes[i].neighbors().size();j++){
+	                Index nid = nodes[i].neighbors()[j].nodeId;
+	                nodes[i].neighbors()[j].Ro.push_back(fabs(x_vec[i] - x_vec[nid]));
+	            }
+	        }
         }
     }
 
-    for(int i=0;i<nodes.size();i++){
-        for(int j=0;j<nodes[i].neighbors().size();j++){
-            double mx = *std::max_element(nodes[i].neighbors()[j].Ro.begin(), nodes[i].neighbors()[j].Ro.end());
-            nodes[i].neighbors()[j].algebraicDist = (1/(mx + epsilon));
-            if((bool)options.get("normalize")){
-	            double ad = nodes[i].neighbors()[j].algebraicDist;
-	            Index nbid = nodes[i].neighbors()[j].nodeId;
-	            nodes[i].neighbors()[j].algebraicDist = ad /(sqrt(degree(nodes[i].getNodeId())* degree(nbid)));
+    #pragma omp parallel
+    {
+    	#pragma omp for
+    	for(int i=0;i<nodes.size();i++){
+	        for(int j=0;j<nodes[i].neighbors().size();j++){
+	            double mx = *std::max_element(nodes[i].neighbors()[j].Ro.begin(), nodes[i].neighbors()[j].Ro.end());
+	            nodes[i].neighbors()[j].algebraicDist = (1/(mx + epsilon));
+	            if((bool)options.get("normalize")){
+		            double ad = nodes[i].neighbors()[j].algebraicDist;
+		            Index nbid = nodes[i].neighbors()[j].nodeId;
+		            nodes[i].neighbors()[j].algebraicDist = ad /(sqrt(degree(nodes[i].getNodeId())* degree(nbid)));
+		        }
+		        std::vector<double>().swap(nodes[i].neighbors()[j].Ro);
 	        }
-	        std::vector<double>().swap(nodes[i].neighbors()[j].Ro);
-        }
+	    }
     }
+
+    
 }
 
 
@@ -213,7 +238,7 @@ void Graph::print(){
 			//std::cout<<nodes[i].getNodeId()<<" : "<<nbs.at(j).nodeId<<" : "<<nbs.at(j).weight<<std::endl;
 		}
 	}
-	
+
 	std::cout<<"#edges: "<<getEdgeCount()<<std::endl;
 }
 void Graph::printStats(){
@@ -289,7 +314,7 @@ void Graph::addEdge(const Index& n1, const Index& n2, const edgeweight& weight, 
 void Graph::removeMarkedEdges(Index u){
 	nodes.at(u).removeMarkedEdges();
 }
-void Graph::markEdgeForDeletion(Index u, Neighbor& v){
+void Graph::markEdge(Index u, Neighbor& v){
 	if(degs[u] !=0 && !v.isdelete){
 		nodes.at(u).neighbors()[v.pos].isdelete = true;
 		nodes.at(u).setWeightedDegree(nodes.at(u).getWeightedDegree() - v.weight );

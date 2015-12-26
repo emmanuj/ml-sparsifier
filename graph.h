@@ -49,7 +49,7 @@ public:
 	edgeweight weightedDegree(const Index idx);
 	count degree(const Index& idx);
 	const std::vector<Node>& getNodes()const {return nodes;}
-	
+
 	long getEdgeCount() const{ return edge_count/2;}
 	Node& getNode(const Index& i ){ return nodes[i]; }
 	void setCoarse(const Index& idx, const bool isCoarse){ //sets the coarse flag for a node
@@ -74,7 +74,10 @@ public:
 	void computeAlgebraicDistances(optparse::Values& options);
 	void printUnweightedGraph(std::ofstream& outfile);
 	void removeMarkedEdges(Index from);
-	void markEdgeForDeletion(Index u, Neighbor& v);
+	void markEdge(Index u, Neighbor& v);
+	std::vector<long>& getDegrees(){
+		return degs;
+	}
 
 
 };
