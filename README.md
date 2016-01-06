@@ -11,7 +11,7 @@ For multi-level
 	./msparse -i ~/test_graphs/fb-uf.edges -n 35111 --zero-index --gname fb-uf -o out.edges --param-list 0.1,0.1,0.1 --weak
 
 To set number of openmp threads (set to 8 by default)
-	export OMP_NUM_THREADS=16 
+	export OMP_NUM_THREADS=16
 
 To disable openmp, remove '-fopenmp' from LFLAGS in Makefile
 
@@ -50,7 +50,7 @@ Options
 
 -i - path of input graph
 -n - number of nodes
---gname - shortname for graph. Used to save the output files idshortnam.dat and arrshortname.dat
+--gname - shortname for graph.
 --zero-index - index of first node starts at 0.
 --permute - random shuffle node ordering
 -r -  interpolation order. Default 1.
