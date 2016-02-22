@@ -1,3 +1,6 @@
+Implementation of Single-level and Multilevel sparsification. See paper here: http://arxiv.org/abs/1601.05527
+Note: This project is still in development.
+
 To build:
 
 	make
